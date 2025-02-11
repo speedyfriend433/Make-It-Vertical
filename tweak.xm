@@ -11,7 +11,7 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
         // UIInterfaceOrientationMaskPortrait equals 2.
         return UIInterfaceOrientationMaskPortrait;
     } else {
-        // For landscape, we choose UIInterfaceOrientationMaskLandscapeLeft.
+        // For landscape, choose UIInterfaceOrientationMaskLandscapeLeft.
         return UIInterfaceOrientationMaskLandscapeLeft;
     }
 }
@@ -20,8 +20,11 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
     
-    // Make sure we add the button only once.
-    if (![self.view viewWithTag:1001]) {
+    // Since RootViewController is a forward declaration, cast self to UIViewController
+    UIViewController *vc = (UIViewController *)self;
+    
+    // Add the toggle button only once.
+    if (![vc.view viewWithTag:1001]) {
         UIButton *toggleButton = [UIButton buttonWithType:UIButtonTypeSystem];
         toggleButton.frame = CGRectMake(20, 40, 180, 40);
         toggleButton.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
@@ -32,8 +35,10 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
         toggleButton.tag = 1001;
         
         // When tapped, call our custom toggle method.
-        [toggleButton addTarget:self action:@selector(toggleOrientationButtonTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [self.view addSubview:toggleButton];
+        [toggleButton addTarget:self
+                         action:@selector(toggleOrientationButtonTapped:)
+               forControlEvents:UIControlEventTouchUpInside];
+        [vc.view addSubview:toggleButton];
     }
 }
 
@@ -60,6 +65,5 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
 %end
 
 %ctor {
-    // This constructor doesn’t require additional setup since the hooks inject 
-    // our code in the target app’s RootViewController.
+    // No additional initialization is required.
 }
