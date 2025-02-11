@@ -1,17 +1,16 @@
 #import <UIKit/UIKit.h>
 
-static BOOL isVertical = YES;  // Global flag to track orientation state
+static BOOL isVertical = YES;  // Global flag for the current orientation state
 
 %hook RootViewController
 
-// Override the supportedInterfaceOrientations method so that allowed orientations
-// change depending on the current state.
+// Override the method reporting supported orientations based on our flag.
 - (unsigned long long)supportedInterfaceOrientations {
     if (isVertical) {
-        // UIInterfaceOrientationMaskPortrait equals 2.
+        // Portrait – UIInterfaceOrientationMaskPortrait equals 2.
         return UIInterfaceOrientationMaskPortrait;
     } else {
-        // For landscape, choose UIInterfaceOrientationMaskLandscapeLeft.
+        // Landscape – using UIInterfaceOrientationMaskLandscapeLeft.
         return UIInterfaceOrientationMaskLandscapeLeft;
     }
 }
@@ -20,43 +19,53 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
 - (void)viewDidAppear:(BOOL)animated {
     %orig(animated);
     
-    // Since RootViewController is a forward declaration, cast self to UIViewController
+    // Cast self to UIViewController to gain access to the "view" property.
     UIViewController *vc = (UIViewController *)self;
     
-    // Add the toggle button only once.
+    // Only add the button if it hasn't been added already.
     if (![vc.view viewWithTag:1001]) {
         UIButton *toggleButton = [UIButton buttonWithType:UIButtonTypeSystem];
         toggleButton.frame = CGRectMake(20, 40, 180, 40);
         toggleButton.backgroundColor = [[UIColor blackColor] colorWithAlphaComponent:0.5];
-        // Set the initial title depending on the current state.
         NSString *title = isVertical ? @"Switch to Landscape" : @"Switch to Portrait";
         [toggleButton setTitle:title forState:UIControlStateNormal];
         [toggleButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
         toggleButton.tag = 1001;
         
-        // When tapped, call our custom toggle method.
+        // Add our toggle action.
         [toggleButton addTarget:self
                          action:@selector(toggleOrientationButtonTapped:)
                forControlEvents:UIControlEventTouchUpInside];
+        
         [vc.view addSubview:toggleButton];
     }
 }
 
-// New method that toggles the orientation in real time.
+// This action toggles the orientation when the button is pressed.
 - (void)toggleOrientationButtonTapped:(id)sender {
-    // Toggle the global flag.
+    // Toggle our orientation flag.
     isVertical = !isVertical;
     
-    // Determine the new target orientation.
+    // Determine the target orientation.
     UIInterfaceOrientation targetOrientation = isVertical ? UIInterfaceOrientationPortrait : UIInterfaceOrientationLandscapeLeft;
     
-    // Force the device orientation using KVC (this uses a private API).
-    [[UIDevice currentDevice] setValue:@(targetOrientation) forKey:@"orientation"];
+    // Use NSInvocation to call the private setOrientation: selector on UIDevice.
+    SEL setOrientationSelector = NSSelectorFromString(@"setOrientation:");
+    if ([[UIDevice currentDevice] respondsToSelector:setOrientationSelector]) {
+        NSMethodSignature *signature = [[UIDevice currentDevice] methodSignatureForSelector:setOrientationSelector];
+        NSInvocation *invocation = [NSInvocation invocationWithMethodSignature:signature];
+        [invocation setSelector:setOrientationSelector];
+        [invocation setTarget:[UIDevice currentDevice]];
+        // The argument index starts at 2 (0 is self, 1 is _cmd).
+        int orient = targetOrientation;
+        [invocation setArgument:&orient atIndex:2];
+        [invocation invoke];
+    }
     
-    // Request the system to update the interface orientation.
+    // Ask the system to perform rotation based on the new allowed orientations.
     [UIViewController attemptRotationToDeviceOrientation];
     
-    // Update the button's title to reflect the change.
+    // Update the button title to reflect the new state.
     UIButton *toggleButton = (UIButton *)sender;
     NSString *newTitle = isVertical ? @"Switch to Landscape" : @"Switch to Portrait";
     [toggleButton setTitle:newTitle forState:UIControlStateNormal];
@@ -65,5 +74,5 @@ static BOOL isVertical = YES;  // Global flag to track orientation state
 %end
 
 %ctor {
-    // No additional initialization is required.
+    // No extra initialization required.
 }
